@@ -30,13 +30,14 @@ setwd("~/Dropbox/Dartmouth/Research/Whalen/Projects/affective_ratings/Rotation_F
 
 #NONPCA DF==============================================================================================================================
 #Read in data of first block only 
+#arousal data also has individual difference data
 arousal_data <- read.csv("~/Dropbox/Dartmouth/Research/Whalen/Projects/affective_ratings/Rotation_FirstBlockOnly/arousal_firstblockonly.csv")
-arousal_data_trimmed <- arousal_data[,1:37]
+arousal_data_trimmed <- arousal_data[,1:45]
 valence_data <- read.csv("~/Dropbox/Dartmouth/Research/Whalen/Projects/affective_ratings/Rotation_FirstBlockOnly/valence_firstblockonly.csv")
 #Put data into long form (for mixed effects model)
-rating_data_long <-melt(arousal_data_trimmed, id=c("Internal_ID", measure.vars = c("Ethnicity",	"Race",	"Sex",	"Age",	"Timing", "Phrasing")))
-colnames(rating_data_long)[8] <- "Item"
-colnames(rating_data_long)[9] <- "Arousal"
+rating_data_long <-melt(arousal_data_trimmed, id=c("Internal_ID", measure.vars = c("Ethnicity",	"Race",	"Sex",	"Age",	"Timing", "Phrasing", "BEQ_Neg","BEQ_Pos", "BEQ_Imp", "ERQ_Cog", "ERQ_Exprs", "STAI_T", "RRQ_Rum", "RRQ_Ref")))
+colnames(rating_data_long)[16] <- "Item"
+colnames(rating_data_long)[17] <- "Arousal"
 temp_rating_data_long <-melt(valence_data, id=c("Internal_ID",	measure.vars = c("Ethnicity",	"Race",	"Sex",	"Age",	"Timing", "Phrasing")))
 colnames(temp_rating_data_long)[8] <- "Item"
 colnames(temp_rating_data_long)[9] <- "Valence"
@@ -80,6 +81,16 @@ items_ratings <- rating_data_long_omit %>%
 
 #write.csv(items_ratings, "items_ratings_gender.csv")
 
+#phrasing
+items_ratings_phrasing <- rating_data_long_omit %>%
+  group_by(Item, Timing, Phrasing) %>%
+  dplyr::summarize(Valence = mean(Valence), Arousal = mean(Arousal))
+
+#personality data
+items_ratings_pers <- rating_data_long_omit %>%
+  group_by(Item, Timing, ERQ_Cog, ERQ_Exprs, BEQ_Neg, BEQ_Pos, BEQ_Imp, RRQ_Rum, RRQ_Ref, STAI_T) %>%
+  dplyr::summarize(Valence = mean(Valence), Arousal = mean(Arousal))
+
 #descriptives by item
 itemssummary <- ddply(items_ratings, c("Valence", "Arousal"), summarise,
                       N    = length(Valence),
@@ -115,6 +126,7 @@ fulldatascatter <- ggscatter(rating_data_long_omit, x = ("Valence"), y = ("Arous
                          add = "reg.line", conf.int = TRUE, xlim=c(0,8), ylim =c(0,8))
 fulldatascatter + (aes(color = Timing))
 ggExtra::ggMarginal(fulldatascatter, type = "histogram", fill = "light blue")
+
 
 #same result from ggplot
 ggplot(rating_data_long_omit, aes(x = Valence, y = Arousal, color = Timing)) +
@@ -302,6 +314,13 @@ ggplot(items_ratings, aes(x=`Timing`, y=Valence_z, label=Valence_z)) +
        title= "Diverging Bars") + 
   coord_flip()
 
+#scatter with phrasing
+item_phrasing <- ggscatter(items_ratings_phrasing, x = ("Valence"), y = ("Arousal"),
+                             color = "Phrasing",
+                             add = "reg.line", conf.int = TRUE, xlim=c(0,8), ylim =c(0,8))
+item_phrasing + (aes(color = Phrasing))
+ggExtra::ggMarginal(item_phrasing, type = "histogram", fill = "light blue")
+
 
 #*full data distribution comparison####
 #KM test to compare dist on full data
@@ -333,7 +352,7 @@ KS.test(xtime_item, ytime_item) #not sig different
 
 
 #PCA===================================================================================================
-ReducedDataFrame <- subset(rating_data_long_omit, select=c(1, 8, 9, 10))
+ReducedDataFrame <- subset(rating_data_long_omit, select=c(1, 16, 17, 18))
 
 #FULL DATA
 #scale ON SUBJECT LEVEL, NOT ON GROUP LEVEL
@@ -459,6 +478,11 @@ RCA_ratings <- fit_FinalDataFrame %>%
   group_by(Item, Timing) %>%
   dplyr::summarize(RC1=mean(RC1), RC2 = mean(RC2))
 
+#with pers
+RCA_ratings_pers <- fit_FinalDataFrame %>%
+  group_by(Item, Timing, BEQ_Neg, BEQ_Pos, BEQ_Imp, RRQ_Rum, RRQ_Ref, ERQ_Cog, ERQ_Exprs, STAI_T) %>%
+  dplyr::summarize(RC1=mean(RC1), RC2 = mean(RC2))
+
 RCA_item_scatter <- ggplot(RCA_ratings, aes(x = RC1, y = RC2)) +
   geom_point() + aes(color = Timing, add = "reg.line", conf.int = TRUE) +
   geom_smooth(method = "lm")
@@ -536,6 +560,25 @@ anova(ratings_RC_PCAmodel)
 #Timing7      0.27912    0.02679 30.00000  10.418 1.75e-11 ***
 
 
+#*PRESENTED MODEL WITH PERSONALITY DATA
+ratings_RC_PCAmodel_pers <- lmer(RC2 ~ Timing + STAI_T + ERQ_Cog + ERQ_Exprs + RRQ_Rum + RRQ_Ref + BEQ_Pos + BEQ_Neg + BEQ_Imp + (1|Item), data = RCA_ratings_pers, REML=FALSE) 
+summary(ratings_RC_PCAmodel_pers) 
+sjt.lmer(ratings_RC_PCAmodel)  
+anova(ratings_RC_PCAmodel_pers)
+#Analysis of Variance Table of type III  with  Satterthwaite 
+#approximation for degrees of freedom
+#Sum Sq Mean Sq NumDF DenDF F.value    Pr(>F)    
+#Timing    50.812  50.812     1  2910  53.540  3.26e-13 ***
+#STAI_T     2.702   2.702     1  2910   2.847 0.0916446 .  
+#ERQ_Cog    0.009   0.009     1  2910   0.009 0.9234239    
+#ERQ_Exprs  5.595   5.595     1  2910   5.895 0.0152406 *  
+#RRQ_Rum    1.573   1.573     1  2910   1.657 0.1980928    
+#RRQ_Ref   11.508  11.508     1  2910  12.126 0.0005046 ***
+#BEQ_Pos    5.373   5.373     1  2910   5.662 0.0174011 *  
+#BEQ_Neg    2.197   2.197     1  2910   2.315 0.1282108    
+#BEQ_Imp    0.048   0.048     1  2910   0.051 0.8214756 
+
+
 #*NON PCA MODEL DATA
 #Use mixed model with random intercepts for both subjects (Internal_ID) and images (Item)
 arousal_results <- lmer(Arousal ~ Timing * Phrasing + (1|Internal_ID) + (1|Item), data=rating_data_long) #
@@ -568,11 +611,16 @@ summary(arousal_results)
 sjt.lmer(arousal_results) 
 anova(arousal_results)
 
-#lmer arousal not rotated
-#ITEMS
+#*lmer arousal not rotated
+#*ITEMS
 ratings_arousal_results <- lmer(Arousal ~ Timing + (1|Item), data=items_ratings) #
 summary(ratings_arousal_results)
 anova(ratings_arousal_results)
+
+#*ITEMS_WITH PERS
+ratings_arousal_results_pers <- lmer(Arousal ~ Timing + + STAI_T + ERQ_Cog + ERQ_Exprs + RRQ_Rum + RRQ_Ref + BEQ_Pos + BEQ_Neg + BEQ_Imp + (1|Item), data=items_ratings_pers) #
+summary(ratings_arousal_results_pers)
+anova(ratings_arousal_results_pers)
 
 #FULL DATA
 valence_results <- lmer(Valence ~ Timing + (1|Internal_ID) + (1|Item), data=rating_data_long) #
@@ -609,6 +657,12 @@ anova(valence_results)
 ratings_valence_results <- lmer(Valence ~ Timing + (1|Item), data=items_ratings) #
 summary(ratings_valence_results)
 
+ratings_valence_results_pers <- lmer(Valence ~ Timing + + STAI_T + ERQ_Cog + ERQ_Exprs + RRQ_Rum + RRQ_Ref + BEQ_Pos + BEQ_Neg + BEQ_Imp + (1|Item), data=items_ratings_pers) #
+anova(ratings_valence_results_pers)
+
+
+
+
 
 
 #CLUSTERING#########################
@@ -624,20 +678,32 @@ iclust(meta[,3:32])
 omega(meta[,3:32]) 
 library(corrplot)
 corrplot(cor(meta[3:32]), order = "hclust", tl.col='black', tl.cex=.75) 
+corrplot(cor(forclus_2[3:8]), order = "hclust", tl.col='black', tl.cex=.75) 
+meta_nodiff <- meta[c(3, 4, 9, 10, 21, 22)]
+corrplot(cor(meta_nodiff), order = "hclust", tl.col='black', tl.cex=.75) 
 
 #kmeans
 items_2_Cluster <- kmeans(forclus_2[5:6], 3, nstart = 20)
 items_2_Cluster$cluster
 items_2_Cluster$cluster <- as.factor(items_2_Cluster$cluster)
-ggplot(forclus_2, aes(Valence_allsubjects_study_2, Arousal_allsubjects_study_2, color = items_2_Cluster$cluster)) + geom_point()
+ggplot(forclus_2, aes(Valence_allsubjects_study_2, Arousal_allsubjects_study_2, color = items_2_Cluster$cluster)) + 
+    geom_point() +
+    xlim(0,8) + 
+    ylim(0,8)
+
 
 #2dcluster
 library(cluster)
-clusplot(forclus_2, items_2_Cluster$cluster, main='2D representation of the Cluster solution',
+clusplot(forclus_2, items_2_Cluster$cluster, main='2D representation of the Cluster Solution for 2-second Image',
          color=TRUE, shade=TRUE,
-         labels=2, lines=0)
+         labels=3, lines=0, text = forclus_2$Description)
 
-#items label clsuter--2
+library(factoextra)
+fviz_cluster(item_2, data = forclus_2[,c("Valence_allsubjects_study_2",	"Arousal_allsubjects_study_2")])
+text(x=forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, labels=forclus_2$Description,col=item_2$cluster+1)
+
+
+#items label cluster--2
 item_2 <- kmeans(forclus_2[,c("Valence_allsubjects_study_2",	"Arousal_allsubjects_study_2")], centers=3, nstart=10)
 o=order(item_2$cluster)
 data.frame(forclus_2$Item[o],item_2$cluster[o])
@@ -654,13 +720,13 @@ plot(forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_
 text(x=forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, labels=forclus_2$Description,col=item_2$cluster+1)
 
 
-#items label clsuter--7
+#items label cluster--7
 item_7 <- kmeans(forclus_7[,c("Valence_allsubjects_study_7",	"Arousal_allsubjects_study_7")], centers=3, nstart=10)
 o=order(item_7$cluster)
 data.frame(forclus_7$Item[o],item_7$cluster[o])
 
 plot(forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, type="n", xlim=c(0,5), xlab="Valence_7", ylab="Arousal_7")
-text(x=forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, labels=forclus_7$Item,col=item_7$cluster+1)
+text(x=forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, labels=forclus_7$Description,col=item_7$cluster+1)
 
 #description label cluster--7
 item_7 <- kmeans(forclus_7[,c("Valence_allsubjects_study_7",	"Arousal_allsubjects_study_7")], centers=3, nstart=10)
