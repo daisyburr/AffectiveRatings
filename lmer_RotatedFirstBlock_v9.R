@@ -460,11 +460,12 @@ int2 + stat_summary(fun.y = mean, geom = "line", size = 2, aes(group=Timing))
 
 #scatter 
 #PCA
-scatter <- ggscatter(fit_FinalDataFrame, x = "RC1", y = "RC2",
-                     color = "Timing",
-                     add = "reg.line", conf.int = TRUE, xlim=c(-4,8), ylim =c(-4,8))
-#for stats 
-scatter + stat_cor(aes(color = Timing), label.x = 1)
+RCA_scatter <- ggscatter(RCA_ratings, x = "RC1", y = "RC2",
+                            color = "Timing",
+                            add = "reg.line", conf.int = TRUE)
+RCA_scatter + stat_cor(aes(color = Timing), label.x = 6) + scale_alpha_continuous(limits=c(0,3))
+ggExtra::ggMarginal(RCA_scatter, type = "histogram", fill = "light blue")
+
 
 #for hist
 ggExtra::ggMarginal(scatter, type = "histogram", fill = "light blue")
@@ -667,15 +668,21 @@ anova(ratings_valence_results_pers)
 
 #CLUSTERING#########################
 library(amap)
+#load
 meta <- read.csv("IAPS_Metadata.csv")
+#define clusters
 forclus_2<-subset(meta, select=c("Item", "Description", "Valence_allsubjects_standard", "Arousal_allsubjects_standard", "Valence_allsubjects_study_2", "Arousal_allsubjects_study_2","Valence_allsubjects_diff_2", "Arousal_allsubjects_diff_2"))
 forclus_7<-subset(meta, select=c("Item", "Description", "Valence_allsubjects_standard", "Arousal_allsubjects_standard", "Valence_allsubjects_study_7", "Arousal_allsubjects_study_7","Valence_allsubjects_diff_7", "Arousal_allsubjects_diff_7"))
 hdist <- Dist(forclus_7, method="correlation", upper=T)
 
+#scatterplot
 library(scatterplot3d)
 library(mclust)
+#iclust
 iclust(meta[,3:32])
+#omega
 omega(meta[,3:32]) 
+#corrplots
 library(corrplot)
 corrplot(cor(meta[3:32]), order = "hclust", tl.col='black', tl.cex=.75) 
 corrplot(cor(forclus_2[3:8]), order = "hclust", tl.col='black', tl.cex=.75) 
@@ -683,65 +690,68 @@ meta_nodiff <- meta[c(3, 4, 9, 10, 21, 22)]
 corrplot(cor(meta_nodiff), order = "hclust", tl.col='black', tl.cex=.75) 
 
 #kmeans
+#2
 items_2_Cluster <- kmeans(forclus_2[5:6], 3, nstart = 20)
 items_2_Cluster$cluster
 items_2_Cluster$cluster <- as.factor(items_2_Cluster$cluster)
+
+#plot
 ggplot(forclus_2, aes(Valence_allsubjects_study_2, Arousal_allsubjects_study_2, color = items_2_Cluster$cluster)) + 
     geom_point() +
     xlim(0,8) + 
     ylim(0,8)
 
-
 #2dcluster
 library(cluster)
+library(factoextra)
+#add labels to df
+forclus_2$cluster <- item_2$cluster
+#fviz
+fviz <- fviz_cluster(item_2, geom = NULL, data = forclus_2[,c("Valence_allsubjects_study_2","Arousal_allsubjects_study_2")]) + geom_text(aes(label = forclus_2$Description, color = cluster))
+fviz + theme_minimal()
+
+#clus
 clusplot(forclus_2, items_2_Cluster$cluster, main='2D representation of the Cluster Solution for 2-second Image',
          color=TRUE, shade=TRUE,
          labels=3, lines=0, text = forclus_2$Description)
-
-library(factoextra)
-fviz_cluster(item_2, data = forclus_2[,c("Valence_allsubjects_study_2",	"Arousal_allsubjects_study_2")])
-text(x=forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, labels=forclus_2$Description,col=item_2$cluster+1)
 
 
 #items label cluster--2
 item_2 <- kmeans(forclus_2[,c("Valence_allsubjects_study_2",	"Arousal_allsubjects_study_2")], centers=3, nstart=10)
 o=order(item_2$cluster)
 data.frame(forclus_2$Item[o],item_2$cluster[o])
+plot(forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, type="n", xlim=c(0,7), ylim=c(0,7), xlab="Valence_2", ylab="Arousal_2")
+text(x=forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, labels=forclus_2$Valence_allsubjects_standard,col=item_2$cluster+1)
 
-plot(forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, type="n", xlim=c(0,5), xlab="Valence_2", ylab="Arousal_2")
-text(x=forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, labels=forclus_2$Item,col=item_2$cluster+1)
-
-#description label cluster--2
-item_2 <- kmeans(forclus_2[,c("Valence_allsubjects_study_2",	"Arousal_allsubjects_study_2")], centers=3, nstart=10)
-o=order(item_2$cluster)
-data.frame(forclus_2$Item[o],item_2$cluster[o])
-
-plot(forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, type="n", xlim=c(0,5), xlab="Valence_2", ylab="Arousal_2")
+#items description label cluster--2
+plot(forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, type="n", xlim=c(0,7), ylim=c(0,7), xlab="Valence_2", ylab="Arousal_2")
 text(x=forclus_2$Valence_allsubjects_study_2, forclus_2$Arousal_allsubjects_study_2, labels=forclus_2$Description,col=item_2$cluster+1)
 
+#7
+forclus_7$cluster <- item_7$cluster
+#fviz
+fviz_7 <- fviz_cluster(item_7, geom = NULL, data = forclus_7[,c("Valence_allsubjects_study_7","Arousal_allsubjects_study_7")]) + geom_text(aes(label = forclus_7$Description, color = cluster))
+fviz_7 + theme_minimal()
 
 #items label cluster--7
 item_7 <- kmeans(forclus_7[,c("Valence_allsubjects_study_7",	"Arousal_allsubjects_study_7")], centers=3, nstart=10)
 o=order(item_7$cluster)
 data.frame(forclus_7$Item[o],item_7$cluster[o])
-
-plot(forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, type="n", xlim=c(0,5), xlab="Valence_7", ylab="Arousal_7")
+plot(forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, type="n", xlim=c(0,7), ylim=c(0,7), xlab="Valence_7", ylab="Arousal_7")
 text(x=forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, labels=forclus_7$Description,col=item_7$cluster+1)
 
 #description label cluster--7
 item_7 <- kmeans(forclus_7[,c("Valence_allsubjects_study_7",	"Arousal_allsubjects_study_7")], centers=3, nstart=10)
 o=order(item_7$cluster)
 data.frame(forclus_7$Item[o],item_7$cluster[o])
-
-plot(forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, type="n", xlim=c(0,5), xlab="Valence_7", ylab="Arousal_7")
+plot(forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, type="n", xlim=c(0,7), ylim=c(0,7), xlab="Valence_7", ylab="Arousal_7")
 text(x=forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, labels=forclus_7$Description,col=item_7$cluster+1)
 
 #description label cluster--7--with labels as standard ratings
 item_7 <- kmeans(forclus_7[,c("Valence_allsubjects_study_7",	"Arousal_allsubjects_study_7")], centers=3, nstart=10)
 o=order(item_7$cluster)
 data.frame(forclus_7$Item[o],item_7$cluster[o])
-
-plot(forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, type="n", xlim=c(0,5), xlab="Valence_7", ylab="Arousal_7")
+plot(forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, type="n", xlim=c(0,7), ylim=c(0,7), xlab="Valence_7", ylab="Arousal_7")
 text(x=forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, labels=forclus_7$Valence_allsubjects_standard,col=item_7$cluster+1)
 
 #description label cluster--7--with labels as DIFFERENCE scores
@@ -751,3 +761,35 @@ data.frame(forclus_7$Item[o],item_7$cluster[o])
 
 plot(forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, type="n", xlim=c(0,5), xlab="Valence_7", ylab="Arousal_7")
 text(x=forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, labels=forclus_7$Valence_allsubjects_diff_7,col=item_7$cluster+1)
+
+#prcomp visualizations==========[INCORRECLY MIRRORED!!!!]
+res.pca <- prcomp(PCADataFrame_ITEMS,  scale = TRUE)
+fviz_pca_ind(res.pca, col.ind="cos2")
+## Color by the contributions
+fviz_pca_ind(res.pca, col.ind="contrib") +
+  scale_color_gradient2(low="white", mid="blue",
+                        high="red", midpoint=4)
+#Control automatically the color of individuals
+# using the cos2 or the contributions
+# cos2 = the quality of the individuals on the factor map
+#Gradient color
+fviz_pca_ind(res.pca, col.ind="cos2") +
+  scale_color_gradient2(low="white", mid="blue",
+                        high="red", midpoint=0.6)
+
+fviz_pca_ind(res.pca, label="none", habillage=RCA_ratings$Timing)
+
+p <- fviz_pca_ind(res.pca, label="none", habillage=RCA_ratings$Timing,
+                  addEllipses=TRUE, ellipse.level=0.95)
+print(p)
+
+fviz_pca_var(res.pca, col.var="contrib")+
+  scale_color_gradient2(low="white", mid="blue",
+                        high="red", midpoint=96) +
+  theme_minimal()
+
+fviz_pca_biplot(res.pca)
+#screeplot
+fviz_screeplot(res.pca, ncp=10)
+#####################################
+
