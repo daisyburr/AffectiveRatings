@@ -675,6 +675,19 @@ forclus_2<-subset(meta, select=c("Item", "Description", "Valence_allsubjects_sta
 forclus_7<-subset(meta, select=c("Item", "Description", "Valence_allsubjects_standard", "Arousal_allsubjects_standard", "Valence_allsubjects_study_7", "Arousal_allsubjects_study_7","Valence_allsubjects_diff_7", "Arousal_allsubjects_diff_7"))
 hdist <- Dist(forclus_7, method="correlation", upper=T)
 
+#corrgram
+install.packages("corrgram")
+library(corrgram)
+corrgram(rating_data_long_omit, order=NULL, panel=panel.shade, text.panel=panel.txt,
+         main="Correlogram") 
+
+#heat
+library(ggplot2)
+ggplot(rating_data_long_omit, aes(Item, Arousal))+
+  geom_raster(aes(fill = Valence))+
+  labs(title ="Heat Map", x = "Outlet Identifier", y = "Item Type")+
+  scale_fill_continuous(name = "Item MRP")
+
 #scatterplot
 library(scatterplot3d)
 library(mclust)
@@ -708,7 +721,7 @@ library(factoextra)
 forclus_2$cluster <- item_2$cluster
 #fviz
 fviz <- fviz_cluster(item_2, geom = NULL, data = forclus_2[,c("Valence_allsubjects_study_2","Arousal_allsubjects_study_2")]) + geom_text(aes(label = forclus_2$Description, color = cluster))
-fviz + theme_minimal()
+fviz + theme_minimal() + geom_text(aes(label = forclus_2$Valence_allsubjects_standard))
 
 #clus
 clusplot(forclus_2, items_2_Cluster$cluster, main='2D representation of the Cluster Solution for 2-second Image',
@@ -762,19 +775,41 @@ data.frame(forclus_7$Item[o],item_7$cluster[o])
 plot(forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, type="n", xlim=c(0,5), xlab="Valence_7", ylab="Arousal_7")
 text(x=forclus_7$Valence_allsubjects_study_7, forclus_7$Arousal_allsubjects_study_7, labels=forclus_7$Valence_allsubjects_diff_7,col=item_7$cluster+1)
 
-#prcomp visualizations==========[INCORRECLY MIRRORED!!!!]
-res.pca <- prcomp(PCADataFrame_ITEMS,  scale = TRUE)
-fviz_pca_ind(res.pca, col.ind="cos2")
+#PCA loadings visualizations#########
+library("FactoMineR")
+res.pca <- PCA(PCADataFrame_ITEMS,  graph = FALSE)
+get_eig(res.pca)
+var <- get_pca_var(res.pca)
+var
+# Coordinates
+head(var$coord)
+# Cos2: quality on the factore map
+head(var$cos2)
+# Contributions to the principal components
+head(var$contrib)
+head(var$coord, 4)
+head(var$cos2, 4)
+library("corrplot")
+corrplot(var$cos2, is.corr=FALSE)
+corrplot(var$contrib, is.corr=FALSE)  
+fviz_cos2(res.pca, choice = "var", axes = 1:2)
+fviz_pca_var(res.pca, col.var = "cos2",
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"), 
+             repel = TRUE # Avoid text overlapping
+)
+
 ## Color by the contributions
 fviz_pca_ind(res.pca, col.ind="contrib") +
   scale_color_gradient2(low="white", mid="blue",
                         high="red", midpoint=4)
+
+fviz_pca_var(res.pca, col.var = "darkblue")
 #Control automatically the color of individuals
 # using the cos2 or the contributions
 # cos2 = the quality of the individuals on the factor map
 #Gradient color
 fviz_pca_ind(res.pca, col.ind="cos2") +
-  scale_color_gradient2(low="white", mid="blue",
+  scale_color_gradient2(low="grey", mid="dark blue",
                         high="red", midpoint=0.6)
 
 fviz_pca_ind(res.pca, label="none", habillage=RCA_ratings$Timing)
@@ -783,13 +818,40 @@ p <- fviz_pca_ind(res.pca, label="none", habillage=RCA_ratings$Timing,
                   addEllipses=TRUE, ellipse.level=0.95)
 print(p)
 
-fviz_pca_var(res.pca, col.var="contrib")+
-  scale_color_gradient2(low="white", mid="blue",
-                        high="red", midpoint=96) +
-  theme_minimal()
-
-fviz_pca_biplot(res.pca)
+fviz_pca_biplot(res.pca, label = "var", habillage=RCA_ratings$Timing,
+                addEllipses=TRUE, ellipse.level=0.95,
+                ggtheme = theme_minimal())
 #screeplot
 fviz_screeplot(res.pca, ncp=10)
+
+# Contributions of variables to PC1
+fviz_contrib(res.pca, choice = "var", axes = 1, top = 10)
+# Contributions of variables to PC2
+fviz_contrib(res.pca, choice = "var", axes = 2, top = 10)
+# Create a random continuous variable of length 10
+
+res.desc <- dimdesc(res.pca, axes = c(1,2), proba = 0.05)
+# Description of dimension 1
+res.desc$Dim.1
+res.desc$Dim.2
+
+fviz_pca_ind(res.pca, col.ind = "cos2", 
+             gradient.cols = c("#00AFBB", "#E7B800", "#FC4E07"),
+             repel = TRUE # Avoid text overlapping (slow if many points)
+)
+#scale by size
+fviz_pca_ind(res.pca, pointsize = "cos2", 
+             pointshape = 21, fill = "#E7B800",
+             repel = TRUE # Avoid text overlapping (slow if many points)
+)
+
+fviz_contrib(res.pca, choice = "ind", axes = 1:2)
+
+fviz_pca_ind(res.pca, label="none", habillage=RCA_ratings$Timing,
+             addEllipses=TRUE, ellipse.level=0.95, palette = "Dark4")
 #####################################
+
+
+
+
 
